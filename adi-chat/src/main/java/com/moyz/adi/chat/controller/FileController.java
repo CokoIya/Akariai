@@ -1,13 +1,17 @@
 package com.moyz.adi.chat.controller;
 
 import com.moyz.adi.common.entity.AdiFile;
+import com.moyz.adi.common.enums.ErrorEnum;
 import com.moyz.adi.common.exception.BaseException;
 import com.moyz.adi.common.file.FileOperatorContext;
 import com.moyz.adi.common.file.LocalFileUtil;
 import com.moyz.adi.common.service.FileService;
 import com.moyz.adi.common.util.UrlUtil;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.hibernate.validator.constraints.Length;
@@ -30,108 +34,61 @@ import static com.moyz.adi.common.enums.ErrorEnum.B_IMAGE_LOAD_ERROR;
 import static org.springframework.http.HttpHeaders.CACHE_CONTROL;
 
 @Slf4j
-@RestController
+@Tag(name = "文件Controller", description = "文件上传下载与删除")
 @Validated
+@RestController
+@RequiredArgsConstructor
 public class FileController {
 
-    //缓存一年
-    private static final String CACHE_TIME = "public, max-age=31536000";
+    private final FileService fileService;
 
-    @Resource
-    private FileService fileService;
-
-//    @Operation(summary = "我的图片")
-//    @GetMapping(value = "/my-image/{uuid}", produces = MediaType.IMAGE_PNG_VALUE)
-//    public void myImage(@Length(min = 32, max = 32) @PathVariable String uuid, HttpServletResponse response) {
-//        AdiFile adiFile = fileService.getByUuid(uuid);
-//        if (null == adiFile) {
-//            throw new BaseException(A_FILE_NOT_EXIST);
-//        }
-//        responseImage(uuid, adiFile.getExt(), false, response);
-//    }
-
-    @GetMapping(value = "/my-thumbnail/{uuidWithExt}", produces = MediaType.IMAGE_PNG_VALUE)
-    public void thumbnail(@Length(min = 32) @PathVariable String uuidWithExt, HttpServletResponse response) {
-        String uuid = UrlUtil.getUuid(uuidWithExt);
-        AdiFile adiFile = fileService.getByUuid(uuid);
-        if (null == adiFile) {
-            throw new BaseException(A_FILE_NOT_EXIST);
-        }
-        responseImage(uuid, adiFile.getExt(), true, response);
-    }
-
-//    /**
-//     * 获取图片
-//     *
-//     * @param uuid     图片uuid
-//     * @param response HttpServletResponse
-//     */
-//    @GetMapping(value = "/image/{uuid}", produces = MediaType.IMAGE_PNG_VALUE)
-//    public void image(@Length(min = 32, max = 32) @PathVariable String uuid, HttpServletResponse response) {
-//        AdiFile adiFile = fileService.getByUuid(uuid);
-//        if (null == adiFile) {
-//            throw new BaseException(A_FILE_NOT_EXIST);
-//        }
-//        responseImage(uuid, adiFile.getExt(), false, response);
-//    }
-
-    @GetMapping(value = "/file/{uuidWithExt}")
-    public ResponseEntity<org.springframework.core.io.Resource> file(@Length(min = 32) @PathVariable String uuidWithExt, HttpServletResponse response) {
-        String uuid = UrlUtil.getUuid(uuidWithExt);
-        AdiFile adiFile = fileService.getByUuid(uuid);
-        if (null == adiFile) {
-            throw new BaseException(A_FILE_NOT_EXIST);
-        }
-        if (IMAGE_EXTENSIONS.contains(adiFile.getExt().toLowerCase())) {
-            responseImage(uuid, adiFile.getExt(), false, response);
+    @Operation(summary = "获取文件或图片流")
+    @GetMapping("/file/{uuidWithExt}")
+    public ResponseEntity<?> getFile(@PathVariable String uuidWithExt, HttpServletResponse response) throws IOException {
+        var uuid = UrlUtil.getUuid(uuidWithExt);
+        var file = fileService.getByUuid(uuid);
+        if (file == null) throw new BaseException(ErrorEnum.A_FILE_NOT_EXIST);
+        if (LocalFileUtil.isImage(file.getExt())) {
+            var img = fileService.readMyImage(uuid, false);
+            response.setHeader(HttpHeaders.CACHE_CONTROL, "public, max-age=31536000");
+            ImageIO.write(img, file.getExt(), response.getOutputStream());
             return null;
         }
-        response.setHeader(CACHE_CONTROL, CACHE_TIME);
-        byte[] bytes = LocalFileUtil.readBytes(adiFile.getPath());
-        InputStreamResource inputStreamResource = new InputStreamResource(new ByteArrayInputStream(bytes));
-
-        String fileName = adiFile.getName();
-        if (StringUtils.isBlank(fileName)) {
-            fileName = adiFile.getUuid() + "." + adiFile.getExt();
-        }
+        // download non-image
+        var bytes = LocalFileUtil.readBytes(file.getPath());
+        var resource = new InputStreamResource(new ByteArrayInputStream(bytes));
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentDisposition(ContentDisposition.attachment().filename(fileName).build());
-        return new ResponseEntity<>(inputStreamResource, headers, HttpStatus.OK);
+        headers.setContentDisposition(ContentDisposition.attachment().filename(
+                StringUtils.defaultIfBlank(file.getName(), uuidWithExt)
+        ).build());
+        headers.setCacheControl("public, max-age=31536000");
+        return new ResponseEntity<>(resource, headers, HttpStatus.OK);
     }
 
-    private void responseImage(String uuid, String ext, boolean thumbnail, HttpServletResponse response) {
-        BufferedImage bufferedImage = fileService.readMyImage(uuid, thumbnail);
-        //把图片写给浏览器
-        try {
-            // 缓存30天
-            response.setHeader(CACHE_CONTROL, CACHE_TIME);
-            ImageIO.write(bufferedImage, ext, response.getOutputStream());
-        } catch (IOException e) {
-            log.error("image error", e);
-            throw new BaseException(B_IMAGE_LOAD_ERROR);
-        }
+    @Operation(summary = "上传文件")
+    @PostMapping(path = "/file/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String,String>> uploadFile(@RequestPart MultipartFile file) {
+        var f = fileService.saveFile(file, false);
+        return ResponseEntity.ok(Map.of(
+                "uuid", f.getUuid(),
+                "url", FileOperatorContext.getFileUrl(f)
+        ));
     }
 
-    @PostMapping(path = "/file/upload", headers = "content-type=multipart/form-data", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Map<String, String> upload(@RequestPart(value = "file") MultipartFile file) {
-        Map<String, String> result = new HashMap<>();
-        AdiFile adiFile = fileService.saveFile(file, false);
-        result.put("uuid", adiFile.getUuid());
-        result.put("url", FileOperatorContext.getFileUrl(adiFile));
-        return result;
+    @Operation(summary = "上传图片")
+    @PostMapping(path = "/image/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String,String>> uploadImage(@RequestPart MultipartFile file) {
+        var f = fileService.saveFile(file, true);
+        return ResponseEntity.ok(Map.of(
+                "uuid", f.getUuid(),
+                "url", FileOperatorContext.getFileUrl(f)
+        ));
     }
 
-    @PostMapping(path = "/image/upload", headers = "content-type=multipart/form-data", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Map<String, String> imageUpload(@RequestPart(value = "file") MultipartFile file) {
-        Map<String, String> result = new HashMap<>();
-        AdiFile adiFile = fileService.saveFile(file, true);
-        result.put("uuid", adiFile.getUuid());
-        result.put("url", FileOperatorContext.getFileUrl(adiFile));
-        return result;
-    }
-
+    @Operation(summary = "删除文件")
     @PostMapping("/file/del/{uuid}")
-    public boolean del(@PathVariable String uuid) {
-        return fileService.removeFileAndSoftDel(uuid);
+    public ResponseEntity<Void> delete(@PathVariable String uuid) {
+        fileService.removeFileAndSoftDel(uuid);
+        return ResponseEntity.noContent().build();
     }
 }

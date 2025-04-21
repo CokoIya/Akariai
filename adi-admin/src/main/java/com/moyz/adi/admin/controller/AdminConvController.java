@@ -9,6 +9,7 @@ import com.moyz.adi.common.service.ConversationService;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,10 +19,10 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/admin/conv")
 @Validated
+@RequiredArgsConstructor
 public class AdminConvController {
 
-    @Resource
-    private ConversationService conversationService;
+    private final ConversationService conversationService;
 
     @PostMapping("/search")
     public Page<ConvDto> search(@RequestBody ConvSearchReq searchReq, @NotNull @Min(1) Integer currentPage, @NotNull @Min(10) Integer pageSize) {

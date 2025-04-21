@@ -9,16 +9,17 @@ import com.moyz.adi.common.service.ConversationPresetService;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/admin/conv-preset")
 @Validated
+@RequiredArgsConstructor
 public class AdminConvPresetController {
 
-    @Resource
-    private ConversationPresetService conversationPresetService;
+    private final ConversationPresetService conversationPresetService;
 
     @PostMapping("/search")
     public Page<ConversationPreset> page(@RequestBody ConvPresetSearchReq keyword, @NotNull @Min(1) Integer currentPage, @NotNull @Min(10) Integer pageSize) {

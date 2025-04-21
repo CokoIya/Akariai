@@ -1,6 +1,7 @@
 package com.moyz.adi.common.file;
 
 import cn.hutool.core.img.ImgUtil;
+import com.moyz.adi.common.cosntant.AdiConstant;
 import com.moyz.adi.common.entity.AdiFile;
 import com.moyz.adi.common.exception.BaseException;
 import lombok.extern.slf4j.Slf4j;
@@ -101,5 +102,13 @@ public class LocalFileUtil {
     public static boolean checkIfExist(String filePath) {
         Path path = Paths.get(filePath);
         return Files.exists(path);
+    }
+
+    /**
+     * 判断文件扩展名是否为图片类型
+     */
+    public static boolean isImage(String ext) {
+        if (ext == null) return false;
+        return AdiConstant.IMAGE_EXTENSIONS.contains(ext.toLowerCase());
     }
 }

@@ -9,10 +9,16 @@ import com.moyz.adi.common.service.WorkflowService;
 import com.moyz.adi.common.workflow.WorkflowStarter;
 import com.moyz.adi.common.workflow.node.switcher.OperatorEnum;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -21,95 +27,73 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+
+@Slf4j
+@Tag(name = "工作流 Controller", description = "流程定义与运行时管理")
+@Validated
 @RestController
 @RequestMapping("/workflow")
-@Validated
+@RequiredArgsConstructor
 public class WorkflowController {
 
-    @Resource
-    private WorkflowStarter workflowStarter;
+    private final WorkflowService workflowService;
+    private final WorkflowStarter workflowStarter;
+    private final WorkflowComponentService componentService;
 
-    @Resource
-    private WorkflowService workflowService;
-
-    @Resource
-    private WorkflowComponentService workflowComponentService;
-
+    @Operation(summary = "创建流程")
     @PostMapping("/add")
-    public WorkflowResp add(@RequestBody @Validated WfAddReq addReq) {
-        return workflowService.add(addReq.getTitle(), addReq.getRemark(), addReq.getIsPublic());
+    public ResponseEntity<WorkflowResp> addWorkflow(@Valid @RequestBody WfAddReq req) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(workflowService.add(req.getTitle(), req.getRemark(), req.getIsPublic()));
     }
 
-    @PostMapping("/copy/{wfUuid}")
-    public WorkflowResp copy(@PathVariable String wfUuid) {
-        return workflowService.copy(wfUuid);
+    @Operation(summary = "复制流程")
+    @PostMapping("/copy/{uuid}")
+    public ResponseEntity<WorkflowResp> copyWorkflow(@PathVariable String uuid) {
+        return ResponseEntity.ok(workflowService.copy(uuid));
     }
 
-    @PostMapping("/set-public/{wfUuid}")
-    public void setPublic(@PathVariable String wfUuid, @RequestParam(defaultValue = "true") Boolean isPublic) {
-        workflowService.setPublic(wfUuid, isPublic);
+    @Operation(summary = "更新流程基础信息")
+    @PostMapping("/update/base")
+    public ResponseEntity<WorkflowResp> updateBase(@Valid @RequestBody WfBaseInfoUpdateReq req) {
+        return ResponseEntity.ok(workflowService.updateBaseInfo(req.getUuid(), req.getTitle(), req.getRemark(), req.getIsPublic()));
     }
 
-    @PostMapping("/update")
-    public WorkflowResp update(@RequestBody @Validated WorkflowUpdateReq req) {
-        return workflowService.update(req);
-    }
-
-    @PostMapping("/del/{uuid}")
-    public void delete(@PathVariable String uuid) {
-        workflowService.softDelete(uuid);
-    }
-
-    @PostMapping("/enable/{uuid}")
-    public void enable(@PathVariable String uuid, @RequestParam Boolean enable) {
-        workflowService.enable(uuid, enable);
-    }
-
-    @PostMapping("/base-info/update")
-    public WorkflowResp updateBaseInfo(@RequestBody @Validated WfBaseInfoUpdateReq req) {
-        return workflowService.updateBaseInfo(req.getUuid(), req.getTitle(), req.getRemark(), req.getIsPublic());
-    }
-
-    @Operation(summary = "流式响应")
-    @PostMapping(value = "/run/{wfUuid}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter sseAsk(@PathVariable String wfUuid, @RequestBody WorkflowRunReq runReq) {
-        return workflowStarter.streaming(ThreadContext.getCurrentUser(), wfUuid, runReq.getInputs());
-    }
-
-    @GetMapping("/mine/search")
-    public Page<WorkflowResp> searchMine(@RequestParam(defaultValue = "") String keyword,
-                                         @RequestParam(required = false) Boolean isPublic,
-                                         @NotNull @Min(1) Integer currentPage,
-                                         @NotNull @Min(10) Integer pageSize) {
-        return workflowService.search(keyword, isPublic, null, currentPage, pageSize);
-    }
-
-    /**
-     * 搜索公开工作流
-     *
-     * @param keyword     搜索关键词
-     * @param currentPage 当前页数
-     * @param pageSize    每页数量
-     * @return 工作流列表
-     */
-    @GetMapping("/public/search")
-    public Page<WorkflowResp> searchPublic(@RequestParam(defaultValue = "") String keyword,
-                                           @NotNull @Min(1) Integer currentPage,
-                                           @NotNull @Min(10) Integer pageSize) {
-        return workflowService.searchPublic(keyword, currentPage, pageSize);
-    }
-
-    @GetMapping("/public/operators")
-    public List<Map<String, String>> searchPublic() {
-        List<Map<String, String>> result = new ArrayList<>();
-        for (OperatorEnum operator : OperatorEnum.values()) {
-            result.add(Map.of("name", operator.getName(), "desc", operator.getDesc()));
+    @Operation(summary = "删除/启用/公开流程")
+    @PostMapping("/{action}/{uuid}")
+    public ResponseEntity<Void> modify(@PathVariable String action,
+                                       @PathVariable String uuid,
+                                       @RequestParam(defaultValue = "true") Boolean flag) {
+        switch (action) {
+            case "del" -> workflowService.softDelete(uuid);
+            case "enable" -> workflowService.enable(uuid, flag);
+            case "public" -> workflowService.setPublic(uuid, flag);
+            default -> throw new IllegalArgumentException("Unsupported action");
         }
-        return result;
+        return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/public/component/list")
-    public List<WorkflowComponent> component() {
-        return workflowComponentService.getAllEnable();
+    @Operation(summary = "流式运行流程")
+    @PostMapping(value = "/run/{uuid}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter run(@PathVariable String uuid, @Valid @RequestBody WorkflowRunReq req) {
+        return workflowStarter.streaming(ThreadContext.getCurrentUser(), uuid, req.getInputs());
+    }
+
+    @Operation(summary = "我的流程查询")
+    @GetMapping("/mine/search")
+    public ResponseEntity<Page<WorkflowResp>> searchMine(
+            @RequestParam(defaultValue = "") String kw,
+            @RequestParam(required = false) Boolean isPublic,
+            @RequestParam @Min(1) int page,
+            @RequestParam @Min(1) int size) {
+        return ResponseEntity.ok(workflowService.search(kw, isPublic, null, page, size));
+    }
+
+    @Operation(summary = "公开流程及节点列表")
+    @GetMapping("/public")
+    public ResponseEntity<Map<String, Object>> publicInfo() {
+        var ops = OperatorEnum.values();
+        var comps = componentService.getAllEnable();
+        return ResponseEntity.ok(Map.of("operators", ops, "components", comps));
     }
 }

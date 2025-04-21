@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.moyz</groupId>
-    <artifactId>aideepin</artifactId>
+    <artifactId>Ai_Agent</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
-    <name>aideepin</name>
+    <name>Ai_Agent</name>
     <description>chatgpt</description>
     <modules>
         <module>adi-common</module>

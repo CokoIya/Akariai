@@ -1,9 +1,9 @@
 spring:
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://127.0.0.1:5432/aideepin?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8&tinyInt1isBit=false&allowMultiQueries=true
-    username: postgres
-    password: 123456
+    url: jdbc:postgresql://127.0.0.1:5432/akariai?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8&tinyInt1isBit=false&allowMultiQueries=true
+    username: root
+    password: Wml130426@
     hikari:
       connection-timeout: 10000
       validation-timeout: 3000
@@ -32,7 +32,7 @@ spring:
 
 logging:
   file:
-    path: D:/data/aideepin/logs
+    path: D:/data/akari_agent/logs
   level:
     com.baomidou.mybatisplus: DEBUG
 
@@ -56,10 +56,10 @@ adi:
       database: neo4j
 
 local:
-  files: D:/data/aideepin/files/
-  images: D:/data/aideepin/images/
-  watermark-images: D:/data/aideepin/mark-images/
-  thumbnails: D:/data/aideepin/thumbnails/
-  watermark-thumbnails: D:/data/aideepin/watermark-thumbnails/
-  tmp-images: D:/data/aideepin/tmp-images/
-  chat-memory: D:/data/aideepin/chat-memory/
+  files: D:/data/akari_agent/files/
+  images: D:/data/akari_agent/images/
+  watermark-images: D:/data/akari_agent/mark-images/
+  thumbnails: D:/data/akari_agent/thumbnails/
+  watermark-thumbnails: D:/data/akari_agent/watermark-thumbnails/
+  tmp-images: D:/data/akari_agent/tmp-images/
+  chat-memory: D:/data/akari_agent/chat-memory/

@@ -7,16 +7,17 @@ import com.moyz.adi.common.service.WorkflowService;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/admin/workflow")
 @Validated
+@RequiredArgsConstructor
 public class AdminWorkflowController {
 
-    @Resource
-    private WorkflowService workflowService;
+    private final WorkflowService workflowService;
 
     @PostMapping("/search")
     public Page<WorkflowResp> search(@RequestBody WfSearchReq req,

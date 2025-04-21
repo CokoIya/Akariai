@@ -5,24 +5,34 @@ import com.moyz.adi.common.dto.ConvPresetSearchReq;
 import com.moyz.adi.common.entity.ConversationPreset;
 import com.moyz.adi.common.service.ConversationPresetService;
 import io.swagger.v3.oas.annotations.Operation;
-import jakarta.annotation.Resource;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
 
-@RequestMapping("/conversation-preset")
+@Slf4j
+@Tag(name = "预设会话Controller", description = "搜索与关联预设会话")
+@Validated
 @RestController
+@RequestMapping("/conversation-preset")
+@RequiredArgsConstructor
 public class ConversationPresetController {
 
-    @Resource
-    private ConversationPresetService conversationPresetService;
+    private final ConversationPresetService presetService;
+
 
     @Operation(summary = "搜索预设会话(角色)")
     @PostMapping("/search")
-    public Page<ConversationPreset> page(@RequestBody ConvPresetSearchReq searchReq, @NotNull @Min(1) Integer currentPage, @NotNull @Min(10) Integer pageSize) {
-        return conversationPresetService.search(searchReq.getTitle(), currentPage, pageSize);
+    public ResponseEntity<Page<ConversationPreset>> search(
+            @Valid @RequestBody ConvPresetSearchReq req,
+            @RequestParam @NotNull @Min(1) Integer currentPage,
+            @RequestParam @NotNull @Min(1) Integer pageSize) {
+        var page = presetService.search(req.getTitle(), currentPage, pageSize);
+        return ResponseEntity.ok(page);
     }
 }

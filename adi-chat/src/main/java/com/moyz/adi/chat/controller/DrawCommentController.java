@@ -5,35 +5,49 @@ import com.moyz.adi.common.dto.DrawCommentDto;
 import com.moyz.adi.common.service.DrawCommentService;
 import com.moyz.adi.common.service.DrawService;
 import com.moyz.adi.common.vo.DrawCommentAddReq;
-import jakarta.annotation.Resource;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+@Slf4j
+@Tag(name = "绘图评论Controller", description = "管理绘图评论分页与操作")
+@Validated
 @RestController
 @RequestMapping("/draw/comment")
-@Validated
+@RequiredArgsConstructor
 public class DrawCommentController {
 
-    @Resource
-    private DrawService drawService;
+    private final DrawService drawService;
+    private final DrawCommentService commentService;
 
-    @Resource
-    private DrawCommentService drawCommentService;
-
+    @Operation(summary = "分页获取评论")
     @GetMapping("/list/{uuid}")
-    public Page<DrawCommentDto> listByPage(@PathVariable String uuid, @RequestParam(defaultValue = "1") Integer currentPage, @NotNull @Min(10) Integer pageSize) {
-        return drawService.listCommentsByPage(uuid, currentPage, pageSize);
+    public ResponseEntity<Page<DrawCommentDto>> list(
+            @PathVariable String uuid,
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") @Min(1) Integer size) {
+        var resp = drawService.listCommentsByPage(uuid, page, size);
+        return ResponseEntity.ok(resp);
     }
 
+    @Operation(summary = "新增评论")
     @PostMapping("/add")
-    public DrawCommentDto save(@RequestBody DrawCommentAddReq commentAddReq) {
-        return drawService.addComment(commentAddReq.getDrawUuid(), commentAddReq.getComment());
+    public ResponseEntity<DrawCommentDto> add(@Valid @RequestBody DrawCommentAddReq req) {
+        var dto = drawService.addComment(req.getDrawUuid(), req.getComment());
+        return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }
 
+    @Operation(summary = "删除评论(软删除)")
     @PostMapping("/del")
-    public boolean del(@RequestParam Long id) {
-        return drawCommentService.softDel(id);
+    public ResponseEntity<Void> delete(@RequestParam Long id) {
+        commentService.softDel(id);
+        return ResponseEntity.noContent().build();
     }
 }

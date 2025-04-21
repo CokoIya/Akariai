@@ -8,7 +8,7 @@ server:
 
 spring:
   application:
-    name: AiDeepIn
+    name: Akari_Agent
   profiles:
     active: dev
   mvc:
@@ -53,7 +53,7 @@ mybatis-plus:
 
 logging:
   file:
-    name: /data/aideepin/logs
+    name: /data/akari_agent/logs
 
 adi:
   host: aideepin.com
@@ -65,10 +65,10 @@ adi:
     http-port: 1087
 
 local:
-  files: /data/aideepin/files/
-  images: /data/aideepin/images/
-  watermark-images: /data/aideepin/mark-images/
-  thumbnails: /data/aideepin/thumbnails/
-  watermark-thumbnails: /data/aideepin/watermark-thumbnails/
-  tmp-images: /data/aideepin/tmp-images/
-  chat-memory: /data/aideepin/chat-memory/
+  files: /data/akari_agent/files/
+  images: /data/akari_agent/images/
+  watermark-images: /data/akari_agent/mark-images/
+  thumbnails: /data/akari_agent/thumbnails/
+  watermark-thumbnails: /data/akari_agent/watermark-thumbnails/
+  tmp-images: /data/akari_agent/tmp-images/
+  chat-memory: /data/akari_agent/chat-memory/

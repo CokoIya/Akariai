@@ -11,6 +11,7 @@ import com.moyz.adi.common.util.AiModelUtil;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -20,10 +21,10 @@ import static com.moyz.adi.common.enums.ErrorEnum.A_PARAMS_ERROR;
 @RestController
 @RequestMapping("/admin/model")
 @Validated
+@RequiredArgsConstructor
 public class AdminModelController {
 
-    @Resource
-    private AiModelService aiModelService;
+    private final AiModelService aiModelService;
 
     @PostMapping("/search")
     public Page<AiModelDto> page(@RequestBody AiModelSearchReq aiModelSearchReq, @NotNull @Min(1) Integer currentPage, @NotNull @Min(10) Integer pageSize) {

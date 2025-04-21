@@ -1,17 +1,23 @@
 package com.moyz.adi.chat.controller;
 
 import com.moyz.adi.common.dto.*;
+import com.moyz.adi.common.enums.ErrorEnum;
 import com.moyz.adi.common.exception.BaseException;
 import com.moyz.adi.common.service.DrawService;
 import com.moyz.adi.common.service.FileService;
 import com.moyz.adi.common.util.UrlUtil;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.validator.constraints.Length;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,129 +32,86 @@ import static com.moyz.adi.common.enums.ErrorEnum.*;
  * 绘图
  */
 @Slf4j
+@Tag(name = "绘图Controller", description = "管理AI绘图任务与文件")
+@Validated
 @RestController
 @RequestMapping("/draw")
-@Validated
+@RequiredArgsConstructor
 public class DrawController {
 
-    @Resource
-    private DrawService drawService;
+    private final DrawService drawService;
+    private final FileService fileService;
 
-    @Resource
-    private FileService fileService;
-
+    @Operation(summary = "图片生成")
     @PostMapping("/generation")
-    public Map<String, String> generation(@RequestBody @Validated GenerateImageReq generateImageReq) {
-        String uuid = drawService.createByPrompt(generateImageReq);
-        return Map.of("uuid", uuid);
+    public ResponseEntity<Map<String, String>> generation(@Valid @RequestBody GenerateImageReq req) {
+        var uuid = drawService.createByPrompt(req);
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("uuid", uuid));
     }
 
+    @Operation(summary = "重新生成")
     @PostMapping("/regenerate/{uuid}")
-    public void regenerate(@PathVariable @Length(min = 32, max = 32) String uuid) {
+    public ResponseEntity<Void> regenerate(@PathVariable @Length(min = 32, max = 32) String uuid) {
         drawService.regenerate(uuid);
+        return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "Edit image")
+    @Operation(summary = "编辑图片")
     @PostMapping("/edit")
-    public Map<String, String> edit(@RequestBody EditImageReq editImageReq) {
-        String uuid = drawService.editByOriginalImage(editImageReq);
-        return Map.of("uuid", uuid);
+    public ResponseEntity<Map<String, String>> edit(@Valid @RequestBody EditImageReq req) {
+        var uuid = drawService.editByOriginalImage(req);
+        return ResponseEntity.ok(Map.of("uuid", uuid));
     }
 
-    @Operation(summary = "Image variation")
+    @Operation(summary = "图片变体")
     @PostMapping("/variation")
-    public Map<String, String> variation(@RequestBody VariationImageReq variationImageReq) {
-        String uuid = drawService.variationImage(variationImageReq);
-        return Map.of("uuid", uuid);
+    public ResponseEntity<Map<String, String>> variation(@Valid @RequestBody VariationImageReq req) {
+        var uuid = drawService.variationImage(req);
+        return ResponseEntity.ok(Map.of("uuid", uuid));
     }
 
+    @Operation(summary = "分页列表")
     @GetMapping("/list")
-    public DrawListResp list(@RequestParam Long maxId, @RequestParam int pageSize) {
-        return drawService.listByCurrentUser(maxId, pageSize);
+    public ResponseEntity<DrawListResp> list(
+            @RequestParam Long maxId,
+            @RequestParam int pageSize) {
+        return ResponseEntity.ok(drawService.listByCurrentUser(maxId, pageSize));
     }
 
-
-    /**
-     * 获取绘图任务详情
-     *
-     * @param uuid 绘图任务uuid
-     * @return 绘图任务详情
-     */
+    @Operation(summary = "任务详情")
     @GetMapping("/detail/{uuid}")
-    public DrawDto getOne(@PathVariable String uuid) {
-        DrawDto drawDto = drawService.getPublicOrMine(uuid);
-        if (null == drawDto) {
-            throw new BaseException(A_DRAW_NOT_FOUND);
-        }
-        return drawDto;
+    public ResponseEntity<DrawDto> detail(@PathVariable String uuid) {
+        var dto = drawService.getPublicOrMine(uuid);
+        if (dto == null) throw new BaseException(ErrorEnum.A_DRAW_NOT_FOUND);
+        return ResponseEntity.ok(dto);
     }
 
-    @GetMapping("/detail/newer-public/{uuid}")
-    public DrawDto prevPublic(@PathVariable String uuid) {
-        return drawService.newerPublicOne(uuid);
-    }
-
-    @GetMapping("/detail/older-public/{uuid}")
-    public DrawDto nextPublic(@PathVariable String uuid) {
-        return drawService.olderPublicOne(uuid);
-    }
-
-    @GetMapping("/detail/newer-starred/{uuid}")
-    public DrawDto prevStarred(@PathVariable String uuid) {
-        return drawService.newerStarredOne(uuid);
-    }
-
-    @GetMapping("/detail/older-starred/{uuid}")
-    public DrawDto nextStarred(@PathVariable String uuid) {
-        return drawService.olderStarredOne(uuid);
-    }
-
-    @GetMapping("/detail/newer-mine/{uuid}")
-    public DrawDto prevMine(@PathVariable String uuid) {
-        return drawService.newerMine(uuid);
-    }
-
-    @GetMapping("/detail/older-mine/{uuid}")
-    public DrawDto nextMine(@PathVariable String uuid) {
-        return drawService.olderMine(uuid);
-    }
-
-    /**
-     * 删除绘图任务{uuid}的所有内容（提示词及生成的所有图片）
-     *
-     * @param uuid
-     * @return
-     */
-    @PostMapping("/del/{uuid}")
-    public boolean del(@PathVariable String uuid) {
-        return drawService.del(uuid);
-    }
-
-    /**
-     * 删除绘图任务{uuid}中的一张图片
-     *
-     * @param uuid     绘图任务的uuid
-     * @param fileUuid 待删除图片uuid
-     * @return
-     */
-    @PostMapping("/file/del/{fileUuid}")
-    public boolean fileDel(@RequestParam @NotBlank String uuid, @PathVariable String fileUuid) {
-        return drawService.delGeneratedFile(uuid, fileUuid);
-    }
-
-    @Operation(summary = "将绘图任务设置为公开或私有")
+    @Operation(summary = "切换公开状态")
     @PostMapping("/set-public/{uuid}")
-    public DrawDto setPublic(@PathVariable @NotBlank String uuid, @RequestParam(defaultValue = "false") Boolean isPublic, @RequestParam(required = false) Boolean withWatermark) {
-        return drawService.setDrawPublic(uuid, isPublic, withWatermark);
+    public ResponseEntity<DrawDto> setPublic(
+            @PathVariable String uuid,
+            @RequestParam(defaultValue = "false") Boolean isPublic,
+            @RequestParam(required = false) Boolean withWatermark) {
+        return ResponseEntity.ok(drawService.setDrawPublic(uuid, isPublic, withWatermark));
     }
 
-    @Operation(summary = "公开的绘图任务列表")
-    @GetMapping("/public/list")
-    public DrawListResp publicList(@RequestParam Long maxId, @RequestParam int pageSize) {
-        return drawService.listPublic(maxId, pageSize);
+    @Operation(summary = "删除任务")
+    @PostMapping("/del/{uuid}")
+    public ResponseEntity<Void> delete(@PathVariable String uuid) {
+        drawService.del(uuid);
+        return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "公开的图片,可能带水印（根据水印设置决定）")
+    @Operation(summary = "删除单文件")
+    @PostMapping("/file/del/{fileUuid}")
+    public ResponseEntity<Void> deleteFile(
+            @RequestParam @NotBlank String uuid,
+            @PathVariable String fileUuid) {
+        drawService.delGeneratedFile(uuid, fileUuid);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "公开图片")
     @GetMapping(value = "/public/image/{drawUuid}/{imageUuidWithExt}", produces = MediaType.IMAGE_PNG_VALUE)
     public void publicImage(@Length(min = 32) @PathVariable String drawUuid, @Length(min = 32, max = 32) @PathVariable String imageUuidWithExt, HttpServletResponse response) {
         DrawDto drawDto = drawService.getPublicOrMine(drawUuid);
@@ -166,7 +129,7 @@ public class DrawController {
         }
     }
 
-    @Operation(summary = "公开的缩略图,可能带水印（根据水印设置决定）")
+    @Operation(summary = "公开缩略图")
     @GetMapping(value = "/public/thumbnail/{drawUuid}/{imageUuidWithExt}", produces = MediaType.IMAGE_PNG_VALUE)
     public void publicThumbnail(@Length(min = 32) @PathVariable String drawUuid, @Length(min = 32) @PathVariable String imageUuidWithExt, HttpServletResponse response) {
         DrawDto drawDto = drawService.getPublicOrMine(drawUuid);

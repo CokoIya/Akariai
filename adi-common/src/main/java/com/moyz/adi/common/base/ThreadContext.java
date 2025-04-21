@@ -18,7 +18,7 @@ public class ThreadContext {
         return currentUser.get();
     }
 
-    public static Long getCurrentUserId() {
+    public static User getCurrentUserId() {
         return currentUser.get().getId();
     }
 

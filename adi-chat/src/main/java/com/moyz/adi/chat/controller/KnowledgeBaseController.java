@@ -9,151 +9,142 @@ import com.moyz.adi.common.dto.KbSearchReq;
 import com.moyz.adi.common.entity.AdiFile;
 import com.moyz.adi.common.entity.KnowledgeBase;
 import com.moyz.adi.common.service.KnowledgeBaseService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
+@Slf4j
+@Tag(name = "知识库Controller", description = "CRUD 与索引操作")
+@Validated
 @RestController
 @RequestMapping("/knowledge-base")
-@Validated
+@RequiredArgsConstructor
 public class KnowledgeBaseController {
 
-    @Resource
-    private KnowledgeBaseService knowledgeBaseService;
+    private final KnowledgeBaseService kbService;
 
+    @Operation(summary = "保存或更新知识库")
     @PostMapping("/saveOrUpdate")
-    public KnowledgeBase saveOrUpdate(@RequestBody KbEditReq kbEditReq) {
-        return knowledgeBaseService.saveOrUpdate(kbEditReq);
+    public ResponseEntity<KnowledgeBase> saveOrUpdate(@Valid @RequestBody KbEditReq req) {
+        return ResponseEntity.ok(kbService.saveOrUpdate(req));
     }
 
-    @PostMapping(path = "/uploadDocs/{uuid}", headers = "content-type=multipart/form-data", produces = MediaType.APPLICATION_JSON_VALUE)
-    public boolean uploadDocs(@PathVariable String uuid,
-                              @RequestParam(value = "indexAfterUpload", defaultValue = "true") Boolean indexAfterUpload,
-                              @RequestParam(defaultValue = "") String indexTypes,
-                              @RequestParam("files") MultipartFile[] docs) {
-        knowledgeBaseService.uploadDocs(uuid, indexAfterUpload, docs, List.of(indexTypes.split(",")));
-        return true;
+    @Operation(summary = "批量上传文档并可选索引")
+    @PostMapping(path = "/uploadDocs/{uuid}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Void> uploadDocs(
+            @PathVariable String uuid,
+            @RequestParam(defaultValue = "true") boolean indexAfterUpload,
+            @RequestParam(defaultValue = "") String types,
+            @RequestPart(required = true) MultipartFile[] docs) {
+        List<String> typeList = Arrays.stream(types.split(","))
+                .filter(s -> !s.isBlank())
+                .toList();
+        kbService.uploadDocs(uuid, indexAfterUpload, docs, typeList);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
-    /**
-     * 上传、解析并索引文档
-     *
-     * @param uuid             知识库uuid
-     * @param indexAfterUpload 是否上传完接着索引文档
-     * @param doc              二进制文件
-     * @return 上传成功的文件信息
-     */
-    @PostMapping(path = "/upload/{uuid}", headers = "content-type=multipart/form-data", produces = MediaType.APPLICATION_JSON_VALUE)
-    public AdiFile upload(@PathVariable String uuid,
-                          @RequestParam(value = "indexAfterUpload", defaultValue = "true") Boolean indexAfterUpload,
-                          @RequestParam(defaultValue = "") String indexTypes,
-                          @RequestParam("file") MultipartFile doc) {
-        return knowledgeBaseService.uploadDoc(uuid, indexAfterUpload, doc, List.of(indexTypes.split(",")));
+    @Operation(summary = "上传单个文档并可选索引")
+    @PostMapping(path = "/upload/{uuid}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<AdiFile> upload(
+            @PathVariable String uuid,
+            @RequestParam(defaultValue = "true") boolean indexAfterUpload,
+            @RequestParam(defaultValue = "") String types,
+            @RequestPart(required = true) MultipartFile doc) {
+        List<String> typeList = Arrays.stream(types.split(","))
+                .filter(s -> !s.isBlank())
+                .toList();
+        AdiFile file = kbService.uploadDoc(uuid, indexAfterUpload, doc, typeList);
+        return ResponseEntity.status(HttpStatus.CREATED).body(file);
     }
 
-    /**
-     * 搜索我的知识库
-     *
-     * @param keyword             搜索关键词
-     * @param includeOthersPublic 是否包含其他人公开的知识库
-     * @param currentPage         当前页数
-     * @param pageSize            每页数量
-     * @return 我的知识库列表
-     */
+    @Operation(summary = "搜索我的知识库")
     @GetMapping("/mine/search")
-    public Page<KbInfoResp> searchMine(@RequestParam(defaultValue = "") String keyword,
-                                       @RequestParam(defaultValue = "false") Boolean includeOthersPublic,
-                                       @NotNull @Min(1) Integer currentPage,
-                                       @NotNull @Min(10) Integer pageSize) {
-        return knowledgeBaseService.searchMine(keyword, includeOthersPublic, currentPage, pageSize);
+    public ResponseEntity<Page<KbInfoResp>> searchMine(
+            @RequestParam(defaultValue = "") String keyword,
+            @RequestParam(defaultValue = "false") boolean includeOthersPublic,
+            @RequestParam @Min(1) int currentPage,
+            @RequestParam @Min(1) int pageSize) {
+        Page<KbInfoResp> page = kbService.searchMine(keyword, includeOthersPublic, currentPage, pageSize);
+        return ResponseEntity.ok(page);
     }
 
-    /**
-     * 搜索公开的知识库
-     *
-     * @param keyword     搜索关键词
-     * @param currentPage 当前页数
-     * @param pageSize    每页数量
-     * @return 知识库列表
-     */
+    @Operation(summary = "搜索公开的知识库")
     @GetMapping("/public/search")
-    public Page<KbInfoResp> searchPublic(@RequestParam(defaultValue = "") String keyword,
-                                         @NotNull @Min(1) Integer currentPage,
-                                         @NotNull @Min(10) Integer pageSize) {
-        return knowledgeBaseService.search(KbSearchReq.builder().isPublic(true).title(keyword).build(), currentPage, pageSize);
+    public ResponseEntity<Page<KbInfoResp>> searchPublic(
+            @RequestParam(defaultValue = "") String keyword,
+            @RequestParam @Min(1) int currentPage,
+            @RequestParam @Min(1) int pageSize) {
+        KbSearchReq req = KbSearchReq.builder().isPublic(true).title(keyword).build();
+        Page<KbInfoResp> page = kbService.search(req, currentPage, pageSize);
+        return ResponseEntity.ok(page);
     }
 
-    /**
-     * 知识库详情
-     *
-     * @param uuid 知识库uuid
-     * @return 知识库详情
-     */
+    @Operation(summary = "获取知识库详情")
     @GetMapping("/info/{uuid}")
-    public KnowledgeBase info(@PathVariable String uuid) {
-        return knowledgeBaseService.lambdaQuery()
-                .eq(KnowledgeBase::getUuid, uuid)
-                .eq(KnowledgeBase::getIsDeleted, false)
-                .one();
+    public ResponseEntity<KnowledgeBase> info(@PathVariable String uuid) {
+        Optional<KnowledgeBase> kbOpt = Optional.ofNullable(
+                kbService.lambdaQuery()
+                        .eq(KnowledgeBase::getUuid, uuid)
+                        .eq(KnowledgeBase::getIsDeleted, false)
+                        .one()
+        );
+        return kbOpt.map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
-    /**
-     * 删除知识库
-     *
-     * @param uuid 知识库uuid
-     * @return 成功或失败
-     */
+    @Operation(summary = "软删除知识库")
     @PostMapping("/del/{uuid}")
-    public boolean softDelete(@PathVariable String uuid) {
-        return knowledgeBaseService.softDelete(uuid);
+    public ResponseEntity<Void> delete(@PathVariable String uuid) {
+        kbService.softDelete(uuid);
+        return ResponseEntity.noContent().build();
     }
 
-    /**
-     * 索引整个知识库
-     *
-     * @param uuid 知识库uuid
-     * @return 成功或失败
-     */
+    @Operation(summary = "索引整个知识库")
     @PostMapping("/indexing/{uuid}")
-    public boolean indexing(@PathVariable String uuid, @RequestParam(defaultValue = "") String indexTypes) {
-        return knowledgeBaseService.indexing(uuid, List.of(indexTypes.split(",")));
+    public ResponseEntity<Void> indexing(
+            @PathVariable String uuid,
+            @RequestParam(defaultValue = "") String types) {
+        List<String> typeList = Arrays.stream(types.split(","))
+                .filter(s -> !s.isBlank())
+                .toList();
+        kbService.indexing(uuid, typeList);
+        return ResponseEntity.accepted().build();
     }
 
-    /**
-     * 批量索引知识点
-     *
-     * @param req 知识点列表
-     * @return 成功或失败
-     */
+    @Operation(summary = "批量索引知识点")
     @PostMapping("/item/indexing-list")
-    public boolean indexItems(@RequestBody KbItemIndexBatchReq req) {
-        return knowledgeBaseService.indexItems(List.of(req.getUuids()), List.of(req.getIndexTypes()));
+    public ResponseEntity<Void> indexItems(@Valid @RequestBody KbItemIndexBatchReq req) {
+        kbService.indexItems(Arrays.asList(req.getUuids()), Arrays.asList(req.getIndexTypes()));
+        return ResponseEntity.noContent().build();
     }
 
-    /**
-     * 检查知识库是否已经索引完成
-     *
-     * @return 成功或失败
-     */
+    @Operation(summary = "检查索引状态")
     @GetMapping("/indexing/check")
-    public boolean checkIndex() {
-        return knowledgeBaseService.checkIndexIsFinish();
+    public ResponseEntity<Boolean> checkIndex() {
+        boolean finished = kbService.checkIndexIsFinish();
+        return ResponseEntity.ok(finished);
     }
 
-    /**
-     * 点赞
-     *
-     * @return true:star;false:unstar
-     */
+    @Operation(summary = "切换收藏状态")
     @PostMapping("/star/toggle")
-    public boolean star(@RequestParam @NotBlank String kbUuid) {
-        return knowledgeBaseService.toggleStar(ThreadContext.getCurrentUser(), kbUuid);
+    public ResponseEntity<Boolean> toggleStar(@RequestParam @NotBlank String kbUuid) {
+        boolean result = kbService.toggleStar(ThreadContext.getCurrentUser(), kbUuid);
+        return ResponseEntity.ok(result);
     }
 }

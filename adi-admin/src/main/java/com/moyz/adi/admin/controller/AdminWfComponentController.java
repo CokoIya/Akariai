@@ -8,15 +8,17 @@ import com.moyz.adi.common.service.WorkflowComponentService;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/admin/workflow/component")
 @Validated
+@RequiredArgsConstructor
 public class AdminWfComponentController {
-    @Resource
-    private WorkflowComponentService workflowComponentService;
+
+    private final WorkflowComponentService workflowComponentService;
 
     @PostMapping("/search")
     public Page<WorkflowComponent> search(@RequestBody WfComponentSearchReq searchReq, @NotNull @Min(1) Integer currentPage, @NotNull @Min(10) Integer pageSize) {

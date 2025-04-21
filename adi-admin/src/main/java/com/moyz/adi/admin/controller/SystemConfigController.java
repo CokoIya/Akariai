@@ -9,6 +9,7 @@ import com.moyz.adi.common.service.SysConfigService;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,10 +18,10 @@ import java.util.List;
 @RestController
 @RequestMapping("/admin/sys-config")
 @Validated
+@RequiredArgsConstructor
 public class SystemConfigController {
 
-    @Resource
-    private SysConfigService sysConfigService;
+    private final SysConfigService sysConfigService;
 
     @PostMapping("/search")
     public Page<SysConfigDto> search(@RequestBody SysConfigSearchReq searchReq, @NotNull @Min(1) Integer currentPage, @NotNull @Min(10) Integer pageSize) {

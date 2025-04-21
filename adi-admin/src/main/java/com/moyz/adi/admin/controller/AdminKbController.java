@@ -8,6 +8,7 @@ import com.moyz.adi.common.service.KnowledgeBaseService;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,10 +18,10 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/admin/kb")
 @Validated
+@RequiredArgsConstructor
 public class AdminKbController {
 
-    @Resource
-    private KnowledgeBaseService knowledgeBaseService;
+    private final KnowledgeBaseService knowledgeBaseService;
 
     @PostMapping("/search")
     public Page<KbInfoResp> search(@RequestBody KbSearchReq kbSearchReq, @NotNull @Min(1) Integer currentPage, @NotNull @Min(10) Integer pageSize) {

@@ -1,18 +1,15 @@
 package com.moyz.adi.chat.controller;
 
-import com.moyz.adi.common.dto.ConvAddReq;
-import com.moyz.adi.common.dto.ConvDto;
-import com.moyz.adi.common.dto.ConvEditReq;
-import com.moyz.adi.common.dto.ConvMsgListResp;
+import com.moyz.adi.common.dto.*;
 import com.moyz.adi.common.service.ConversationService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.annotation.Resource;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
+import lombok.RequiredArgsConstructor;
 import org.hibernate.validator.constraints.Length;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,44 +23,56 @@ import java.util.List;
 @RequestMapping("/conversation")
 @RestController
 @Validated
+@RequiredArgsConstructor
 public class ConversationController {
 
-    @Resource
     private ConversationService conversationService;
 
-    @Operation(summary = "获取当前用户所有的对话")
+    @Operation(summary = "获取当前用户所有对话")
     @GetMapping("/list")
-    public List<ConvDto> list() {
-        return conversationService.listByUser();
+    public ResponseEntity<List<ConvDto>> list() {
+        return ResponseEntity.ok(conversationService.listByUser());
     }
 
-    @Operation(summary = "查询某个对话的信息列表")
+
+    @Operation(summary = "查询单个对话的信息列表")
     @GetMapping("/{uuid}")
-    public ConvMsgListResp detail(
-            @Parameter(name = "对话uuid") @PathVariable @NotBlank(message = "对话uuid不能为空") String uuid
-            , @Parameter(name = "最大uuid") @RequestParam String maxMsgUuid
-            , @Parameter(name = "每页数量") @RequestParam @Min(1) @Max(100) int pageSize) {
-        return conversationService.detail(uuid, maxMsgUuid, pageSize);
+    public ResponseEntity<ConvMsgListResp> detail(
+            @PathVariable @NotBlank(message = "uuid 不能为空") String uuid,
+            @RequestParam String maxMsgUuid,
+            @RequestParam @Min(1) @Max(100) int pageSize
+    ) {
+        return ResponseEntity.ok(conversationService.detail(uuid, maxMsgUuid, pageSize));
     }
 
+    @Operation(summary = "创建对话")
     @PostMapping("/add")
-    public ConvDto add(@RequestBody @Validated ConvAddReq convAddReq) {
-        return conversationService.add(convAddReq.getTitle(), convAddReq.getRemark(), convAddReq.getAiSystemMessage());
+    public ResponseEntity<ConvDto> add(@Valid @RequestBody ConvAddReq req) {
+        var dto = conversationService.add(req.getTitle(), req.getRemark(), req.getAiSystemMessage());
+        return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }
 
-    @Operation(summary = "根据预设会话创建用户自己的会话")
+    @Operation(summary = "基于预设创建对话")
     @PostMapping("/addByPreset")
-    public ConvDto addByPreset(@Length(min = 32, max = 32) @RequestParam String presetUuid) {
-        return conversationService.addByPresetConv(presetUuid);
+    public ResponseEntity<ConvDto> addByPreset(@RequestParam @Length(min = 32, max = 32) String presetUuid) {
+        var dto = conversationService.addByPresetConv(presetUuid);
+        return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }
 
+    @Operation(summary = "编辑对话")
     @PostMapping("/edit/{uuid}")
-    public boolean edit(@PathVariable String uuid, @RequestBody ConvEditReq convEditReq) {
-        return conversationService.edit(uuid, convEditReq);
+    public ResponseEntity<Void> edit(
+            @PathVariable String uuid,
+            @Valid @RequestBody ConvEditReq req
+    ) {
+        conversationService.edit(uuid, req);
+        return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "删除对话(软删除)")
     @PostMapping("/del/{uuid}")
-    public boolean softDel(@PathVariable String uuid) {
-        return conversationService.softDel(uuid);
+    public ResponseEntity<Void> delete(@PathVariable String uuid) {
+        conversationService.softDel(uuid);
+        return ResponseEntity.noContent().build();
     }
 }
